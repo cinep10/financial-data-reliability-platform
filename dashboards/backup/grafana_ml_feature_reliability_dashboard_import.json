@@ -1,0 +1,507 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_MYSQL",
+      "label": "mysql",
+      "type": "datasource",
+      "pluginId": "mysql",
+      "pluginName": "MySQL"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "mysql",
+      "name": "MySQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": "10.0.0"
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "ml-data-reliability",
+    "feature-drift",
+    "risk-score"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "profile_id",
+        "type": "query",
+        "label": "profile_id",
+        "hide": 0,
+        "datasource": {
+          "type": "mysql",
+          "uid": "${DS_MYSQL}"
+        },
+        "definition": "SELECT DISTINCT profile_id FROM metric_value_day ORDER BY profile_id",
+        "query": "SELECT DISTINCT profile_id FROM metric_value_day ORDER BY profile_id",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "finance_bank",
+          "value": "finance_bank"
+        }
+      }
+    ]
+  },
+  "time": {
+    "from": "2026-02-09T00:00:00Z",
+    "to": "2026-03-09T23:59:59Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "ML Feature Reliability Dashboard",
+  "uid": "ml-feature-reliability-import",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Risk Score v3",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  risk_score AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}'\nORDER BY dt DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 600
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Current Risk Status v3",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  CASE risk_status\n    WHEN 'normal' THEN 0\n    WHEN 'warning' THEN 1\n    WHEN 'alert' THEN 2\n    ELSE -1\n  END AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}'\nORDER BY dt DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "NORMAL",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "WARNING",
+                  "color": "yellow"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "ALERT",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 3,
+      "title": "ML Reliability Daily Summary",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  risk_score,\n  risk_status,\n  validation_fail_count,\n  validation_warn_count,\n  drift_alert_count,\n  drift_warn_count,\n  ml_feature_alert_count,\n  ml_feature_warn_count,\n  total_signal_count\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nORDER BY dt DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Risk Score v3 Trend",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt AS time,\n  risk_score AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nORDER BY dt",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Risk Score v3 Components",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 5,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT dt AS time, 'validation_fail_count' AS metric, validation_fail_count AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'validation_warn_count' AS metric, validation_warn_count AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'drift_alert_count' AS metric, drift_alert_count AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'drift_warn_count' AS metric, drift_warn_count AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'ml_feature_alert_count' AS metric, ml_feature_alert_count AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'ml_feature_warn_count' AS metric, ml_feature_warn_count AS value\nFROM data_risk_score_day_v3\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "ML Feature Alerts by Group",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 5,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt AS time,\n  feature_group AS metric,\n  COUNT(*) AS value\nFROM ml_feature_drift_result\nWHERE profile_id = '${profile_id}'\n  AND drift_status = 'alert'\n  AND $__timeFilter(dt)\nGROUP BY dt, feature_group\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "ML Feature Drift Overview",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt AS time,\n  feature_name AS metric,\n  AVG(ABS(drift_score)) AS value\nFROM ml_feature_drift_result\nWHERE profile_id = '${profile_id}'\n  AND drift_status IN ('warn','alert')\n  AND $__timeFilter(dt)\nGROUP BY dt, feature_name\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "ML Feature Drift Detail",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  hh,\n  feature_name,\n  feature_group,\n  baseline_value,\n  observed_value,\n  baseline_sd,\n  drift_score,\n  drift_method,\n  drift_status,\n  severity,\n  note\nFROM ml_feature_drift_result\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nORDER BY dt DESC, ABS(drift_score) DESC, feature_name",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "title": "Top Drifted Features",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  feature_name,\n  feature_group,\n  COUNT(*) AS signal_count,\n  ROUND(AVG(ABS(drift_score)), 4) AS avg_abs_drift\nFROM ml_feature_drift_result\nWHERE profile_id = '${profile_id}'\n  AND drift_status IN ('warn','alert')\n  AND $__timeFilter(dt)\nGROUP BY feature_name, feature_group\nORDER BY avg_abs_drift DESC, signal_count DESC\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "title": "Risk Score v2 Trend",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt AS time,\n  risk_score AS value\nFROM data_risk_score_day_v2\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nORDER BY dt",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}

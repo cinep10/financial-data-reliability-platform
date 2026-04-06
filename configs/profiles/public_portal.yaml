@@ -1,0 +1,53 @@
+site_key: "public-portal.example.kr"
+scenario:
+  site_host: "www.public-portal.example.kr"
+  pages:
+    - {path: "/", page_type: "home", weight: 0.10}
+    - {path: "/search.do", page_type: "search", weight: 0.14}
+    - {path: "/notice/list.do", page_type: "notice", weight: 0.14}
+    - {path: "/service/guide.do", page_type: "guide", weight: 0.16}
+    - {path: "/service/apply.do", page_type: "apply", weight: 0.10}
+    - {path: "/faq/list.do", page_type: "faq", weight: 0.10}
+    - {path: "/mypage.do", page_type: "mypage", weight: 0.08}
+    - {path: "/branch/find.do", page_type: "branch", weight: 0.06}
+    - {path: "/news/list.do", page_type: "news", weight: 0.12}
+  countries: [["KR",0.985],["US",0.005],["JP",0.004],["VN",0.003],["SG",0.003]]
+  accept_lang_by_country:
+    KR: [["ko-KR,ko;q=0.9,en-US;q=0.6,en;q=0.4",0.98],["en-US,en;q=0.9,ko;q=0.4",0.02]]
+    US: [["en-US,en;q=0.9",1.0]]
+    JP: [["ja-JP,ja;q=0.9,en;q=0.5",1.0]]
+    VN: [["vi-VN,vi;q=0.9,en-US;q=0.5,en;q=0.3",1.0]]
+    SG: [["en-SG,en;q=0.9,zh;q=0.4",1.0]]
+  device_weights: [["mobile",0.62],["desktop",0.38]]
+  uas_mobile:
+    - ["Mozilla/5.0 (Linux; Android 14; SM-S928N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", 0.60]
+    - ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1", 0.40]
+  uas_desktop:
+    - ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36", 0.75]
+    - ["Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15", 0.15]
+    - ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0", 0.10]
+  event_mix_default: [["view",0.80],["click",0.15],["scroll",0.04],["swipe",0.01]]
+  event_mix_by_page_type: {}
+  pcid_reuse: 0.84
+  pcid_uid_stickiness: 0.95
+  uid_rate: 0.12
+  uid_acquire_half_life_sessions: 8
+  uid_acquire_click_boost: 0.05
+  uid_acquire_page_types: ["mypage","apply"]
+  revisit_ratio_daily: 0.50
+  new_visit_ratio_by_hh: [0.42,0.40,0.38,0.36,0.34,0.34,0.36,0.40,0.46,0.52,0.56,0.56,0.54,0.52,0.50,0.48,0.46,0.44,0.42,0.40,0.38,0.38,0.40,0.42]
+  revisit_ratio_by_hh: [0.58,0.60,0.62,0.64,0.66,0.66,0.64,0.60,0.54,0.48,0.44,0.44,0.46,0.48,0.50,0.52,0.54,0.56,0.58,0.60,0.62,0.62,0.60,0.58]
+  session_mean_sec: 180
+  session_event_rate: 0.018
+  session_event_rate_by_hh: [0.006,0.006,0.006,0.006,0.006,0.007,0.009,0.012,0.015,0.017,0.018,0.018,0.018,0.018,0.018,0.019,0.019,0.018,0.017,0.015,0.012,0.010,0.008,0.007]
+  target_pv_per_visit_mean: 4.8
+  target_pv_per_visit_std: 1.1
+  max_pageviews_per_session: 9
+  server_hit_ratio_by_event: {view: 1.00, click: 0.45, scroll: 0.10, swipe: 0.02}
+  traffic_curve:
+    mode: "hh_multiplier"
+    hh_multiplier: [0.06,0.05,0.05,0.05,0.06,0.10,0.18,0.28,0.44,0.62,0.78,0.88,0.92,0.96,1.00,1.04,1.08,1.10,1.00,0.82,0.60,0.40,0.22,0.12]
+    target_visit_per_hh: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    smooth_window_min: 0
+  weekday_multiplier: {sun: 0.70, mon: 1.04, tue: 1.06, wed: 1.06, thu: 1.04, fri: 0.96, sat: 0.78}
+  exogenous: {enabled: true, weather_type: "clear", campaign_flag: "none", system_flag: "normal", weather_source: "static", weather_file: "", weather_api_base_url: "", weather_api_key: ""}

@@ -1,0 +1,271 @@
+{
+  "profile_id": "finance_bank",
+  "trained_at": "2026-03-18T14:35:26.479915",
+  "train_rows": 23,
+  "test_rows": 6,
+  "feature_cols_requested": [
+    "daily_active_users",
+    "page_view_count",
+    "avg_session_duration_sec",
+    "new_user_ratio",
+    "auth_attempt_count",
+    "auth_success_count",
+    "auth_fail_count",
+    "auth_success_rate",
+    "auth_fail_rate",
+    "otp_request_count",
+    "risk_login_count",
+    "loan_view_count",
+    "loan_apply_start_count",
+    "loan_apply_submit_count",
+    "card_apply_start_count",
+    "card_apply_submit_count",
+    "card_apply_submit_rate",
+    "collector_event_count",
+    "raw_event_count",
+    "estimated_missing_rate",
+    "validation_fail_count",
+    "validation_warn_count",
+    "drift_alert_count",
+    "drift_warn_count",
+    "ml_feature_alert_count",
+    "ml_feature_warn_count",
+    "total_signal_count"
+  ],
+  "feature_cols_used": [
+    "daily_active_users",
+    "page_view_count",
+    "avg_session_duration_sec",
+    "new_user_ratio",
+    "auth_attempt_count",
+    "auth_success_count",
+    "auth_fail_count",
+    "auth_success_rate",
+    "auth_fail_rate",
+    "otp_request_count",
+    "risk_login_count",
+    "loan_view_count",
+    "loan_apply_start_count",
+    "loan_apply_submit_count",
+    "card_apply_start_count",
+    "card_apply_submit_count",
+    "card_apply_submit_rate",
+    "collector_event_count",
+    "raw_event_count",
+    "estimated_missing_rate",
+    "validation_fail_count",
+    "validation_warn_count",
+    "drift_alert_count",
+    "drift_warn_count",
+    "ml_feature_alert_count",
+    "ml_feature_warn_count",
+    "total_signal_count"
+  ],
+  "feature_cols_missing_filled_as_zero": [
+    "total_signal_count"
+  ],
+  "label_rule": "alert if target_risk_status='alert' else fallback target_risk_score >= 1000.0",
+  "train_label_distribution": {
+    "0": 19,
+    "1": 4
+  },
+  "test_label_distribution": {
+    "0": 6
+  },
+  "classes": [
+    0,
+    1
+  ],
+  "top_coefficients": [
+    {
+      "feature_name": "drift_alert_count",
+      "coefficient": 1.1243318045725852,
+      "abs_coefficient": 1.1243318045725852
+    },
+    {
+      "feature_name": "estimated_missing_rate",
+      "coefficient": -1.0724634725956503,
+      "abs_coefficient": 1.0724634725956503
+    },
+    {
+      "feature_name": "drift_warn_count",
+      "coefficient": 0.9421423022052516,
+      "abs_coefficient": 0.9421423022052516
+    },
+    {
+      "feature_name": "ml_feature_alert_count",
+      "coefficient": 0.37118363951828176,
+      "abs_coefficient": 0.37118363951828176
+    },
+    {
+      "feature_name": "otp_request_count",
+      "coefficient": -0.3234799775285013,
+      "abs_coefficient": 0.3234799775285013
+    },
+    {
+      "feature_name": "validation_warn_count",
+      "coefficient": 0.22999719758421863,
+      "abs_coefficient": 0.22999719758421863
+    },
+    {
+      "feature_name": "auth_attempt_count",
+      "coefficient": -0.2008735223458815,
+      "abs_coefficient": 0.2008735223458815
+    },
+    {
+      "feature_name": "loan_apply_start_count",
+      "coefficient": -0.1481198624431241,
+      "abs_coefficient": 0.1481198624431241
+    },
+    {
+      "feature_name": "new_user_ratio",
+      "coefficient": -0.07708957721833014,
+      "abs_coefficient": 0.07708957721833014
+    },
+    {
+      "feature_name": "loan_view_count",
+      "coefficient": -0.06036538261364565,
+      "abs_coefficient": 0.06036538261364565
+    },
+    {
+      "feature_name": "avg_session_duration_sec",
+      "coefficient": -0.05903309303306965,
+      "abs_coefficient": 0.05903309303306965
+    },
+    {
+      "feature_name": "ml_feature_warn_count",
+      "coefficient": 0.05612644531008008,
+      "abs_coefficient": 0.05612644531008008
+    },
+    {
+      "feature_name": "raw_event_count",
+      "coefficient": -0.052102494612915225,
+      "abs_coefficient": 0.052102494612915225
+    },
+    {
+      "feature_name": "card_apply_start_count",
+      "coefficient": -0.046107011954803906,
+      "abs_coefficient": 0.046107011954803906
+    },
+    {
+      "feature_name": "page_view_count",
+      "coefficient": -0.034666965526290276,
+      "abs_coefficient": 0.034666965526290276
+    }
+  ],
+  "accuracy": 0.5,
+  "classification_report": {
+    "0": {
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1-score": 0.6666666666666666,
+      "support": 6.0
+    },
+    "1": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 0.0
+    },
+    "accuracy": 0.5,
+    "macro avg": {
+      "precision": 0.5,
+      "recall": 0.25,
+      "f1-score": 0.3333333333333333,
+      "support": 6.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1-score": 0.6666666666666666,
+      "support": 6.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      3,
+      3
+    ],
+    [
+      0,
+      0
+    ]
+  ],
+  "top_permutation_importance": [
+    {
+      "feature_name": "drift_warn_count",
+      "importance_mean": 0.18333333333333335,
+      "importance_std": 0.11666666666666667
+    },
+    {
+      "feature_name": "otp_request_count",
+      "importance_mean": 0.08333333333333334,
+      "importance_std": 0.08333333333333334
+    },
+    {
+      "feature_name": "auth_attempt_count",
+      "importance_mean": 0.08333333333333334,
+      "importance_std": 0.08333333333333334
+    },
+    {
+      "feature_name": "avg_session_duration_sec",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "page_view_count",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "auth_success_count",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "new_user_ratio",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "auth_fail_count",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "auth_success_rate",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "auth_fail_rate",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "daily_active_users",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "risk_login_count",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "loan_view_count",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "loan_apply_submit_count",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    },
+    {
+      "feature_name": "loan_apply_start_count",
+      "importance_mean": 0.0,
+      "importance_std": 0.0
+    }
+  ]
+}

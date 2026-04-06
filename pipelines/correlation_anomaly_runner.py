@@ -1,0 +1,210 @@
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timedelta
+from decimal import Decimal
+from statistics import mean
+
+import pymysql
+
+
+PAIRS = [
+    ("page_view_count", "avg_session_duration_sec"),
+    ("auth_attempt_count", "auth_success_count"),
+    ("auth_attempt_count", "otp_request_count"),
+    ("auth_attempt_count", "auth_fail_count"),
+    ("loan_view_count", "loan_apply_start_count"),
+    ("loan_apply_start_count", "loan_apply_submit_count"),
+    ("card_apply_start_count", "card_apply_submit_count"),
+]
+
+
+def daterange(start: str, end: str):
+    cur = datetime.strptime(start, "%Y-%m-%d").date()
+    end_dt = datetime.strptime(end, "%Y-%m-%d").date()
+    while cur <= end_dt:
+        yield cur.isoformat()
+        cur += timedelta(days=1)
+
+
+def connect_mysql(args):
+    return pymysql.connect(
+        host=args.host,
+        port=args.port,
+        user=args.user,
+        password=args.password,
+        database=args.db,
+        charset="utf8mb4",
+        autocommit=False,
+        cursorclass=pymysql.cursors.DictCursor,
+    )
+
+
+def ensure_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS metric_correlation_anomaly_day (
+          profile_id VARCHAR(64) NOT NULL,
+          dt DATE NOT NULL,
+          pair_name VARCHAR(150) NOT NULL,
+          left_metric VARCHAR(100) NOT NULL,
+          right_metric VARCHAR(100) NOT NULL,
+          baseline_ratio DECIMAL(20,6) NULL,
+          observed_ratio DECIMAL(20,6) NULL,
+          ratio_diff DECIMAL(20,6) NULL,
+          ratio_diff_pct DECIMAL(20,6) NULL,
+          anomaly_status VARCHAR(20) NOT NULL,
+          severity VARCHAR(20) NULL,
+          note VARCHAR(255) NULL,
+          run_id VARCHAR(64) NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (profile_id, dt, pair_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
+
+def safe_ratio(left: float, right: float) -> float:
+    if right == 0:
+        return 0.0
+    return left / right
+
+
+def q(v) -> str:
+    return str(Decimal(str(v)).quantize(Decimal("0.000001")))
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Correlation/ratio anomaly runner")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=3306)
+    ap.add_argument("--user", required=True)
+    ap.add_argument("--password", default="")
+    ap.add_argument("--db", required=True)
+    ap.add_argument("--profile-id", required=True)
+    ap.add_argument("--date")
+    ap.add_argument("--dt-from")
+    ap.add_argument("--dt-to")
+    ap.add_argument("--truncate", action="store_true")
+    args = ap.parse_args()
+
+    dates = [args.date] if args.date else list(daterange(args.dt_from, args.dt_to))
+    run_id = f"corranom_{args.profile_id}_{dates[0].replace('-', '')}_{dates[-1].replace('-', '')}"
+
+    conn = connect_mysql(args)
+    try:
+        with conn.cursor() as cur:
+            ensure_table(cur)
+            if args.truncate:
+                cur.execute(
+                    "DELETE FROM metric_correlation_anomaly_day WHERE profile_id=%s AND dt BETWEEN %s AND %s",
+                    (args.profile_id, dates[0], dates[-1]),
+                )
+
+            for dt in dates:
+                dt_obj = datetime.strptime(dt, "%Y-%m-%d").date()
+                hist_start = (dt_obj - timedelta(days=7)).isoformat()
+                hist_end = (dt_obj - timedelta(days=1)).isoformat()
+
+                rows = []
+                for left_metric, right_metric in PAIRS:
+                    cur.execute(
+                        """
+                        SELECT dt, metric_name, metric_value
+                        FROM metric_value_day
+                        WHERE profile_id=%s
+                          AND metric_name IN (%s, %s)
+                          AND dt BETWEEN %s AND %s
+                        ORDER BY dt
+                        """,
+                        (args.profile_id, left_metric, right_metric, hist_start, hist_end),
+                    )
+                    hist = cur.fetchall()
+
+                    hist_map = {}
+                    for r in hist:
+                        hist_map.setdefault(str(r["dt"]), {})[r["metric_name"]] = float(r["metric_value"] or 0)
+
+                    baseline_ratios = []
+                    for _, vals in hist_map.items():
+                        baseline_ratios.append(safe_ratio(vals.get(left_metric, 0.0), vals.get(right_metric, 0.0)))
+
+                    cur.execute(
+                        """
+                        SELECT metric_name, metric_value
+                        FROM metric_value_day
+                        WHERE profile_id=%s
+                          AND metric_name IN (%s, %s)
+                          AND dt=%s
+                        """,
+                        (args.profile_id, left_metric, right_metric, dt),
+                    )
+                    obs_rows = cur.fetchall()
+                    obs_map = {r["metric_name"]: float(r["metric_value"] or 0) for r in obs_rows}
+                    if not obs_map:
+                        continue
+
+                    baseline = mean(baseline_ratios) if baseline_ratios else 0.0
+                    observed = safe_ratio(obs_map.get(left_metric, 0.0), obs_map.get(right_metric, 0.0))
+                    diff = observed - baseline
+                    diff_pct = 0.0 if baseline == 0 else diff / baseline
+
+                    abs_pct = abs(diff_pct)
+                    if abs_pct >= 0.5:
+                        status = "alert"
+                        severity = "high"
+                    elif abs_pct >= 0.25:
+                        status = "warn"
+                        severity = "medium"
+                    else:
+                        status = "normal"
+                        severity = "low"
+
+                    pair_name = f"{left_metric}__vs__{right_metric}"
+                    note = f"baseline_ratio={baseline:.4f}, observed_ratio={observed:.4f}"
+                    rows.append(
+                        (
+                            args.profile_id,
+                            dt,
+                            pair_name,
+                            left_metric,
+                            right_metric,
+                            q(baseline),
+                            q(observed),
+                            q(diff),
+                            q(diff_pct),
+                            status,
+                            severity,
+                            note,
+                            run_id,
+                        )
+                    )
+
+                if rows:
+                    cur.executemany(
+                        """
+                        INSERT INTO metric_correlation_anomaly_day
+                        (profile_id, dt, pair_name, left_metric, right_metric, baseline_ratio, observed_ratio,
+                         ratio_diff, ratio_diff_pct, anomaly_status, severity, note, run_id)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON DUPLICATE KEY UPDATE
+                          baseline_ratio=VALUES(baseline_ratio),
+                          observed_ratio=VALUES(observed_ratio),
+                          ratio_diff=VALUES(ratio_diff),
+                          ratio_diff_pct=VALUES(ratio_diff_pct),
+                          anomaly_status=VALUES(anomaly_status),
+                          severity=VALUES(severity),
+                          note=VALUES(note),
+                          run_id=VALUES(run_id)
+                        """,
+                        rows,
+                    )
+
+        conn.commit()
+        print(f"[OK] correlation anomaly completed: run_id={run_id}, dates={len(dates)}")
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()

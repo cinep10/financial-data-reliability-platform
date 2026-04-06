@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+import argparse
+import os
+from decimal import Decimal
+
+import pymysql
+
+
+def d(val) -> Decimal:
+    try:
+        return Decimal(str(val or 0))
+    except Exception:
+        return Decimal("0")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--host", default=os.getenv("DB_HOST", "127.0.0.1"))
+    ap.add_argument("--port", type=int, default=int(os.getenv("DB_PORT", "3306")))
+    ap.add_argument("--user", default=os.getenv("DB_USER", "nethru"))
+    ap.add_argument("--password", default=os.getenv("DB_PASSWORD", "nethru1234"))
+    ap.add_argument("--db", default=os.getenv("DB_NAME", "weblog"))
+    ap.add_argument("--profile-id", required=True)
+    ap.add_argument("--dt-from", required=True)
+    ap.add_argument("--dt-to", required=True)
+    ap.add_argument("--truncate", action="store_true")
+    args = ap.parse_args()
+
+    conn = pymysql.connect(
+        host=args.host,
+        port=args.port,
+        user=args.user,
+        password=args.password,
+        database=args.db,
+        autocommit=False,
+        cursorclass=pymysql.cursors.DictCursor,
+    )
+    try:
+        with conn.cursor() as cur:
+            if args.truncate:
+                cur.execute(
+                    "DELETE FROM data_risk_score_day_v3 WHERE profile_id=%s AND dt BETWEEN %s AND %s",
+                    (args.profile_id, args.dt_from, args.dt_to),
+                )
+
+            cur.execute(
+                """
+                SELECT DISTINCT dt
+                FROM metric_value_day
+                WHERE profile_id=%s AND dt BETWEEN %s AND %s
+                ORDER BY dt
+                """,
+                (args.profile_id, args.dt_from, args.dt_to),
+            )
+            dates = [str(r["dt"]) for r in cur.fetchall()]
+
+            for dt in dates:
+                # validation as daily normalized score
+                cur.execute(
+                    """
+                    SELECT total_rules, warn_count, fail_count
+                    FROM validation_summary_day
+                    WHERE profile_id=%s AND dt=%s
+                    ORDER BY validation_run_id DESC
+                    LIMIT 1
+                    """,
+                    (args.profile_id, dt),
+                )
+                vr = cur.fetchone() or {}
+                total_rules = max(int(vr.get("total_rules") or 0), 1)
+                validation_score = min(
+                    Decimal("1"),
+                    (d(vr.get("fail_count")) * Decimal("2") + d(vr.get("warn_count"))) / Decimal(str(total_rules)),
+                )
+
+                cur.execute(
+                    """
+                    SELECT mapping_coverage
+                    FROM mapping_coverage_day
+                    WHERE dt=%s
+                    LIMIT 1
+                    """,
+                    (dt,),
+                )
+                mc = cur.fetchone() or {}
+                mapping_coverage = d(mc.get("mapping_coverage") or 1)
+                mapping_score = min(Decimal("1"), Decimal("1") - mapping_coverage)
+
+                cur.execute(
+                    """
+                    SELECT metric_name, drift_score, drift_status, severity
+                    FROM metric_drift_result_r
+                    WHERE profile_id=%s AND dt=%s
+                    """,
+                    (args.profile_id, dt),
+                )
+                drift_rows = cur.fetchall()
+                drift_scores = []
+                anomaly_scores = []
+                for row in drift_rows:
+                    score = d(row.get("drift_score"))
+                    drift_scores.append(score)
+                    name = row["metric_name"]
+                    if (
+                        "conversion" in name
+                        or name.endswith("_submit_count")
+                        or name.endswith("_success_count")
+                        or name in ("submit_capture_rate", "success_outcome_capture_rate")
+                    ):
+                        anomaly_scores.append(score)
+
+                drift_score = min(Decimal("1"), (sum(drift_scores) / Decimal(str(len(drift_scores))))) if drift_scores else Decimal("0")
+                anomaly_score = min(Decimal("1"), (sum(anomaly_scores) / Decimal(str(len(anomaly_scores))))) if anomaly_scores else Decimal("0")
+
+                final_risk_score = (
+                    validation_score * Decimal("0.35")
+                    + drift_score * Decimal("0.30")
+                    + anomaly_score * Decimal("0.20")
+                    + mapping_score * Decimal("0.15")
+                )
+
+                if final_risk_score >= Decimal("0.70"):
+                    risk_grade = "high"
+                elif final_risk_score >= Decimal("0.40"):
+                    risk_grade = "medium"
+                else:
+                    risk_grade = "low"
+
+                cur.execute(
+                    """
+                    REPLACE INTO data_risk_score_day_v3
+                    (profile_id, dt, metric_nm, validation_score, drift_score, anomaly_score,
+                     mapping_score, final_risk_score, risk_grade)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        args.profile_id,
+                        dt,
+                        "ALL",
+                        str(validation_score),
+                        str(drift_score),
+                        str(anomaly_score),
+                        str(mapping_score),
+                        str(final_risk_score),
+                        risk_grade,
+                    ),
+                )
+                print(
+                    f"[OK] risk v3 completed: profile_id={args.profile_id}, dt={dt}, "
+                    f"score={final_risk_score:.4f}, grade={risk_grade}"
+                )
+
+            conn.commit()
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,490 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_MYSQL",
+      "label": "mysql",
+      "type": "datasource",
+      "pluginId": "mysql",
+      "pluginName": "MySQL"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "mysql",
+      "name": "MySQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": "10.0.0"
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "ml-reliability",
+    "ml-explainability",
+    "prediction-monitoring"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "profile_id",
+        "type": "query",
+        "label": "profile_id",
+        "hide": 0,
+        "datasource": {
+          "type": "mysql",
+          "uid": "${DS_MYSQL}"
+        },
+        "definition": "SELECT DISTINCT profile_id FROM ml_feature_vector_day ORDER BY profile_id",
+        "query": "SELECT DISTINCT profile_id FROM ml_feature_vector_day ORDER BY profile_id",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "finance_bank",
+          "value": "finance_bank"
+        }
+      },
+      {
+        "name": "model_version",
+        "type": "query",
+        "label": "model_version",
+        "hide": 0,
+        "datasource": {
+          "type": "mysql",
+          "uid": "${DS_MYSQL}"
+        },
+        "definition": "SELECT DISTINCT model_version FROM ml_prediction_result ORDER BY model_version",
+        "query": "SELECT DISTINCT model_version FROM ml_prediction_result ORDER BY model_version",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "v1",
+          "value": "v1"
+        }
+      }
+    ]
+  },
+  "time": {
+    "from": "2026-02-09T00:00:00Z",
+    "to": "2026-03-09T23:59:59Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "ML Explainability and Prediction Monitoring Dashboard",
+  "uid": "ml-explainability-monitoring-import",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Latest Prediction Alert Probability",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(prob_alert * 100, 2) AS value\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\nORDER BY dt DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Latest Predicted Risk Status",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  CASE predicted_risk_status\n    WHEN 'not_alert' THEN 0\n    WHEN 'alert' THEN 1\n    ELSE -1\n  END AS value\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\nORDER BY dt DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "NOT ALERT",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "ALERT",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Latest Prediction Summary",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  model_name,\n  model_version,\n  predicted_label,\n  predicted_risk_status,\n  prob_not_alert,\n  prob_alert,\n  actual_risk_status,\n  actual_risk_score\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\nORDER BY dt DESC\nLIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Prediction vs Actual Risk Score",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT dt AS time, 'actual_risk_score' AS metric, actual_risk_score AS value\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\n  AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'pred_alert_prob_x100' AS metric, prob_alert * 100 AS value\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\n  AND $__timeFilter(dt)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Prediction Status Trend",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt AS time,\n  predicted_risk_status AS metric,\n  COUNT(*) AS value\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\n  AND $__timeFilter(dt)\nGROUP BY dt, predicted_risk_status\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Feature Importance (Latest Top 15)",
+      "type": "bargauge",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  feature_name AS metric,\n  COALESCE(importance_mean, abs_coefficient) AS value\nFROM ml_feature_importance\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\n  AND dt = (\n    SELECT MAX(dt)\n    FROM ml_feature_importance\n    WHERE profile_id = '${profile_id}'\n      AND model_version = '${model_version}'\n  )\nORDER BY importance_rank ASC\nLIMIT 15",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "Feature Importance Detail",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  model_name,\n  model_version,\n  feature_name,\n  coefficient,\n  abs_coefficient,\n  importance_mean,\n  importance_std,\n  importance_rank\nFROM ml_feature_importance\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\nORDER BY dt DESC, importance_rank ASC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "Prediction Detail",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  model_name,\n  model_version,\n  predicted_label,\n  predicted_risk_status,\n  prob_not_alert,\n  prob_alert,\n  actual_risk_status,\n  actual_risk_score\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\n  AND $__timeFilter(dt)\nORDER BY dt DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "title": "Model Signal Quality",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT dt AS time, 'prob_alert' AS metric, prob_alert AS value\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\n  AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'prob_not_alert' AS metric, prob_not_alert AS value\nFROM ml_prediction_result\nWHERE profile_id = '${profile_id}'\n  AND model_version = '${model_version}'\n  AND $__timeFilter(dt)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}

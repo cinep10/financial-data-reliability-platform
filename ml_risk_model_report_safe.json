@@ -1,0 +1,75 @@
+{
+  "model_name": "ml_risk_model",
+  "model_version": "ml_risk_safe_v6",
+  "mode": "supervised",
+  "feature_columns": [
+    "daily_active_users",
+    "page_view_count",
+    "avg_session_duration_sec",
+    "new_user_ratio",
+    "auth_attempt_count",
+    "auth_success_count",
+    "auth_fail_count",
+    "auth_success_rate",
+    "auth_fail_rate",
+    "otp_request_count",
+    "risk_login_count",
+    "loan_view_count",
+    "loan_apply_start_count",
+    "loan_apply_submit_count",
+    "card_apply_start_count",
+    "card_apply_submit_count",
+    "card_apply_submit_rate",
+    "collector_event_count",
+    "raw_event_count",
+    "estimated_missing_rate",
+    "validation_fail_count",
+    "validation_warn_count",
+    "drift_alert_count",
+    "drift_warn_count",
+    "ml_feature_alert_count",
+    "ml_feature_warn_count",
+    "scenario_active_flag"
+  ],
+  "label_definition": "scenario-aware label from ml_feature_vector_day.target_risk_label",
+  "train_all_history": true,
+  "train_mode": "curated_history",
+  "train_start_dt": "2026-01-01",
+  "train_end_dt": "2026-03-31",
+  "row_count": 90,
+  "train_row_count": 62,
+  "test_row_count": 28,
+  "class_distribution": {
+    "0": 41,
+    "1": 20,
+    "2": 29
+  },
+  "metrics": {
+    "accuracy": 0.6428571428571429,
+    "precision_weighted": 0.5714285714285714,
+    "recall_weighted": 0.6428571428571429,
+    "f1_weighted": 0.568922305764411,
+    "confusion_matrix_labels": [
+      0,
+      1,
+      2
+    ],
+    "confusion_matrix": [
+      [
+        8,
+        0,
+        3
+      ],
+      [
+        0,
+        0,
+        7
+      ],
+      [
+        0,
+        0,
+        10
+      ]
+    ]
+  }
+}

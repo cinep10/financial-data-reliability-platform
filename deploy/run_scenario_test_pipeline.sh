@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+
+SCENARIO_NAME="${1:?scenario_name required}"
+DT_FROM="${2:?start_date required}"
+DT_TO="${3:?end_date required}"
+PROFILE_ID="${4:-finance_bank}"
+INTENSITY="${5:-medium}"
+
+DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_PORT="${DB_PORT:-3306}"
+DB_USER="${DB_USER:-nethru}"
+DB_PASSWORD="${DB_PASSWORD:-nethru1234}"
+DB_NAME="${DB_NAME:-weblog}"
+
+RUN_PRE_ML="${RUN_PRE_ML:-true}"
+RUN_ML="${RUN_ML:-true}"
+RUN_SUMMARY="${RUN_SUMMARY:-true}"
+TRAIN_ALL_HISTORY="${TRAIN_ALL_HISTORY:-true}"
+TRAIN_MODE="${TRAIN_MODE:-curated_history}"
+
+echo "[INFO] scenario test v5"
+echo "[INFO] scenario=$SCENARIO_NAME intensity=$INTENSITY start=$DT_FROM end=$DT_TO profile=$PROFILE_ID"
+
+echo "[STEP 0] inject scenario"
+"$PYTHON_BIN" "$PROJECT_ROOT/pipelines/scenario_injector.py" \
+  --host "$DB_HOST" --port "$DB_PORT" \
+  --user "$DB_USER" --password "$DB_PASSWORD" \
+  --db "$DB_NAME" \
+  --profile-id "$PROFILE_ID" \
+  --scenario-name "$SCENARIO_NAME" \
+  --intensity "$INTENSITY" \
+  --dt-from "$DT_FROM" \
+  --dt-to "$DT_TO"
+
+if [[ "$RUN_PRE_ML" == "true" ]]; then
+  echo "[STEP 1] rerun pre-ML"
+  RUN_SIMULATION=false \
+  RUN_PARSE_LOAD=false \
+  RUN_COLLECTOR=true \
+  RUN_ANALYZER=true \
+  RUN_RISK_V3=false \
+  RUN_RISK_V4=true \
+  RUN_ACTION_ENGINE=true \
+  bash "$PROJECT_ROOT/deploy/run_pre_ml_backfill_pipeline_final.sh" "$DT_FROM" "$DT_TO" "$PROFILE_ID"
+fi
+
+if [[ "$RUN_ML" == "true" ]]; then
+  echo "[STEP 2] rerun ML"
+  TRAIN_ALL_HISTORY="$TRAIN_ALL_HISTORY" \
+  TRAIN_MODE="$TRAIN_MODE" \
+  bash "$PROJECT_ROOT/deploy/run_ml_backfill_pipeline_v2.sh" "$DT_FROM" "$DT_TO" "$PROFILE_ID"
+fi
+
+if [[ "$RUN_SUMMARY" == "true" ]]; then
+  echo "[STEP 3] summarize scenario"
+  SCENARIO_RUN_ID=$(mysql -N -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+    -e "SELECT MAX(scenario_run_id) FROM scenario_experiment_run WHERE profile_id='$PROFILE_ID' AND scenario_name='$SCENARIO_NAME';")
+
+  "$PYTHON_BIN" "$PROJECT_ROOT/pipelines/scenario_experiment_runner.py" \
+    --host "$DB_HOST" --port "$DB_PORT" \
+    --user "$DB_USER" --password "$DB_PASSWORD" \
+    --db "$DB_NAME" \
+    --profile-id "$PROFILE_ID" \
+    --scenario-run-id "$SCENARIO_RUN_ID" \
+    --dt-from "$DT_FROM" \
+    --dt-to "$DT_TO" \
+    --truncate
+
+  echo "[DONE] scenario test completed: scenario=$SCENARIO_NAME intensity=$INTENSITY run_id=$SCENARIO_RUN_ID"
+fi

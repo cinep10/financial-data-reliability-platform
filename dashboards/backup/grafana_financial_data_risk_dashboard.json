@@ -1,0 +1,774 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_MYSQL",
+      "label": "mysql",
+      "type": "datasource",
+      "pluginId": "mysql",
+      "pluginName": "MySQL"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "mysql",
+      "name": "MySQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": "10.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "barchart",
+      "name": "Bar chart",
+      "version": "10.0.0"
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Daily Risk Score",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT risk_score AS value\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}'\nORDER BY dt DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 6
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Current Risk Status",
+      "type": "stat",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE risk_status\n  WHEN 'normal' THEN 0\n  WHEN 'warning' THEN 1\n  WHEN 'alert' THEN 2\n  ELSE -1\nEND AS value\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}'\nORDER BY dt DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "NORMAL",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "WARNING",
+                  "color": "yellow"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "ALERT",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Today Summary",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  risk_score,\n  risk_status,\n  validation_fail_count,\n  validation_warn_count,\n  drift_alert_count,\n  drift_warn_count\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}'\nORDER BY dt DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Risk Score Trend",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 5
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt AS time,\n  risk_score AS value\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nORDER BY dt",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Risk Component Breakdown",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 5
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT dt AS time, 'validation_fail_count' AS metric, validation_fail_count AS value\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'validation_warn_count' AS metric, validation_warn_count AS value\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'drift_alert_count' AS metric, drift_alert_count AS value\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'drift_warn_count' AS metric, drift_warn_count AS value\nFROM data_risk_score_day\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Validation Summary by Day",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 5
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT dt AS time, 'pass_count' AS metric, pass_count AS value\nFROM validation_summary_day\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'warn_count' AS metric, warn_count AS value\nFROM validation_summary_day\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nUNION ALL\nSELECT dt AS time, 'fail_count' AS metric, fail_count AS value\nFROM validation_summary_day\nWHERE profile_id = '${profile_id}' AND $__timeFilter(dt)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Hourly Event Volume",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  metric_name AS metric,\n  metric_value AS value\nFROM (\n  SELECT TIMESTAMP(dt, MAKETIME(hh, 0, 0)) AS time, profile_id, metric_name, metric_value\n  FROM metric_value_hh\n) t\nWHERE profile_id = '${profile_id}'\n  AND metric_name IN ('raw_event_count', 'collector_event_count', 'page_view_count')\n  AND $__timeFilter(time)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "Missing Rate (Hourly)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  metric_value AS value\nFROM (\n  SELECT TIMESTAMP(dt, MAKETIME(hh, 0, 0)) AS time, profile_id, metric_name, metric_value\n  FROM metric_value_hh\n) t\nWHERE profile_id = '${profile_id}'\n  AND metric_name = 'estimated_missing_rate'\n  AND $__timeFilter(time)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "title": "Auth Attempt / Success / Fail",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 21
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  metric_name AS metric,\n  metric_value AS value\nFROM (\n  SELECT TIMESTAMP(dt, MAKETIME(hh, 0, 0)) AS time, profile_id, metric_name, metric_value\n  FROM metric_value_hh\n) t\nWHERE profile_id = '${profile_id}'\n  AND metric_name IN ('auth_attempt_count', 'auth_success_count', 'auth_fail_count')\n  AND $__timeFilter(time)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "title": "Auth Success / Fail Rate",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 21
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  metric_name AS metric,\n  metric_value AS value\nFROM (\n  SELECT TIMESTAMP(dt, MAKETIME(hh, 0, 0)) AS time, profile_id, metric_name, metric_value\n  FROM metric_value_hh\n) t\nWHERE profile_id = '${profile_id}'\n  AND metric_name IN ('auth_success_rate', 'auth_fail_rate')\n  AND $__timeFilter(time)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "OTP / Risk Login",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 21
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  metric_name AS metric,\n  metric_value AS value\nFROM (\n  SELECT TIMESTAMP(dt, MAKETIME(hh, 0, 0)) AS time, profile_id, metric_name, metric_value\n  FROM metric_value_hh\n) t\nWHERE profile_id = '${profile_id}'\n  AND metric_name IN ('otp_request_count', 'risk_login_count')\n  AND $__timeFilter(time)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "title": "Loan Funnel Hourly",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  metric_name AS metric,\n  metric_value AS value\nFROM (\n  SELECT TIMESTAMP(dt, MAKETIME(hh, 0, 0)) AS time, profile_id, metric_name, metric_value\n  FROM metric_value_hh\n) t\nWHERE profile_id = '${profile_id}'\n  AND metric_name IN ('loan_view_count', 'loan_apply_start_count', 'loan_apply_submit_count')\n  AND $__timeFilter(time)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "title": "Card Funnel Hourly",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  time,\n  metric_name AS metric,\n  metric_value AS value\nFROM (\n  SELECT TIMESTAMP(dt, MAKETIME(hh, 0, 0)) AS time, profile_id, metric_name, metric_value\n  FROM metric_value_hh\n) t\nWHERE profile_id = '${profile_id}'\n  AND metric_name IN ('card_apply_start_count', 'card_apply_submit_count')\n  AND $__timeFilter(time)\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Validation Fail/Warn Detail",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  hh,\n  rule_group,\n  rule_name,\n  metric_name,\n  validation_status,\n  severity,\n  observed_value,\n  expected_value,\n  diff_value,\n  note\nFROM validation_result\nWHERE profile_id = '${profile_id}'\n  AND validation_status IN ('warn', 'fail')\n  AND $__timeFilter(dt)\nORDER BY dt DESC, hh DESC, severity DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "title": "Validation Fail Count by Rule",
+      "type": "barchart",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  rule_name AS metric,\n  COUNT(*) AS value\nFROM validation_result\nWHERE profile_id = '${profile_id}'\n  AND validation_status = 'fail'\n  AND $__timeFilter(dt)\nGROUP BY rule_name\nORDER BY value DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "title": "Drift Alert / Warn Count by Day",
+      "type": "timeseries",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 45
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt AS time,\n  'drift_alert_count' AS metric,\n  SUM(CASE WHEN drift_status = 'alert' THEN 1 ELSE 0 END) AS value\nFROM metric_drift_result_r\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nGROUP BY dt\nUNION ALL\nSELECT\n  dt AS time,\n  'drift_warn_count' AS metric,\n  SUM(CASE WHEN drift_status = 'warn' THEN 1 ELSE 0 END) AS value\nFROM metric_drift_result_r\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nGROUP BY dt\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 17,
+      "title": "Drift Score Detail",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 45
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  hh,\n  metric_name,\n  baseline_value,\n  observed_value,\n  drift_score,\n  drift_method,\n  drift_status,\n  severity,\n  detail,\n  run_id\nFROM metric_drift_result_r\nWHERE profile_id = '${profile_id}'\n  AND $__timeFilter(dt)\nORDER BY dt DESC, hh DESC, ABS(drift_score) DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 18,
+      "title": "Alert Metrics Only",
+      "type": "table",
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_MYSQL}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 45
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${DS_MYSQL}"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  dt,\n  hh,\n  metric_name,\n  metric_group,\n  source_layer,\n  baseline_value,\n  observed_value,\n  drift_score,\n  drift_method,\n  drift_status,\n  severity\nFROM metric_drift_result\nWHERE profile_id = '${profile_id}'\n  AND drift_status = 'alert'\n  AND $__timeFilter(dt)\nORDER BY dt DESC, hh DESC, ABS(drift_score) DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "data-reliability",
+    "risk-control",
+    "mysql"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "profile_id",
+        "type": "query",
+        "label": "profile_id",
+        "hide": 0,
+        "datasource": {
+          "type": "mysql",
+          "uid": "${DS_MYSQL}"
+        },
+        "definition": "SELECT DISTINCT profile_id FROM metric_value_day ORDER BY profile_id",
+        "query": "SELECT DISTINCT profile_id FROM metric_value_day ORDER BY profile_id",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "default",
+          "value": "default"
+        }
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Financial Data Risk Control Platform",
+  "uid": "fin-data-risk-control",
+  "version": 1,
+  "weekStart": ""
+}

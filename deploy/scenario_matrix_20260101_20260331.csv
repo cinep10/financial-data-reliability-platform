@@ -1,0 +1,17 @@
+start_date,end_date,scenario,intensity
+2026-01-01,2026-01-07,baseline,baseline
+2026-01-08,2026-01-14,funnel_break,light
+2026-01-15,2026-01-21,funnel_break,medium
+2026-01-22,2026-01-28,funnel_break,severe
+
+2026-02-01,2026-02-07,auth_failure,light
+2026-02-08,2026-02-14,auth_failure,medium
+2026-02-15,2026-02-21,auth_failure,severe
+
+2026-02-22,2026-02-28,mixed_incident,medium
+
+2026-03-01,2026-03-07,weather_drop,light
+2026-03-08,2026-03-14,weather_drop,severe
+
+2026-03-15,2026-03-21,campaign_spike,medium
+2026-03-22,2026-03-31,mixed_incident,severe

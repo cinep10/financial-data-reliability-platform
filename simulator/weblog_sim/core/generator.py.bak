@@ -1,0 +1,248 @@
+from __future__ import annotations
+
+import random
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Iterable, List, Tuple, Optional
+
+from .timeutil import apache_time, KST
+from .randomutil import clamp, poisson, make_uuid, weighted_choice
+from .scenario import ScenarioConfig, PageSpec
+from .traffic import WeatherDrift, traffic_multiplier
+from .http_model import sample_latency_ms, sample_status, sample_bytes, sample_referrer, event_to_path
+from .identity import IdentityPool
+from .weather_provider import build_weather_provider
+from .exogenous import ExogenousState
+from ..meta.store_base import MetaStore, LogFormatMeta
+
+
+@dataclass
+class Session:
+    sid: str
+    visitor_pcid: str
+    start: datetime
+    end: datetime
+    is_new_visitor: bool = False
+    target_pageviews: int = 1
+    emitted_pageviews: int = 0
+    burst_mode: bool = False
+
+
+class WeblogGenerator:
+    def __init__(self, scenario: ScenarioConfig, meta_store: MetaStore, drift: WeatherDrift, seed: Optional[int] = None):
+        self.scenario = scenario
+        self.meta_store = meta_store
+        self.drift = drift
+        if seed is not None:
+            random.seed(seed)
+        self.id_pool = IdentityPool(scenario, drift)
+        self.new_visit_ratio_by_hh = getattr(scenario, "new_visit_ratio_by_hh", [max(0.05, 1.0 - float(getattr(scenario, "revisit_ratio_daily", 0.70)))] * 24)
+        self.revisit_ratio_by_hh = getattr(scenario, "revisit_ratio_by_hh", [float(getattr(scenario, "revisit_ratio_daily", 0.70))] * 24)
+        self.session_event_rate_by_hh = getattr(scenario, "session_event_rate_by_hh", [float(getattr(scenario, "session_event_rate", 0.02))] * 24)
+        self.weather_provider = build_weather_provider(getattr(scenario, "exogenous", None))
+
+    def _exo(self, when: datetime) -> ExogenousState:
+        return self.weather_provider.get_state(when)
+
+    def _weighted_page_items(self, when: datetime) -> List[Tuple[PageSpec, float]]:
+        exo = self._exo(when)
+        items: List[Tuple[PageSpec, float]] = []
+        for p in self.scenario.pages:
+            w = float(p.weight) * self.drift.page_weight_multiplier(p.page_type)
+            if exo.enabled and exo.campaign_flag == "loan_promo":
+                if p.page_type in ("loan", "loan_main", "loan_apply", "product_loan"):
+                    w *= 1.8
+                elif p.page_type in ("card", "deposit"):
+                    w *= 0.9
+            elif exo.enabled and exo.campaign_flag == "card_promo":
+                if p.page_type in ("card", "card_main", "card_apply", "product_card"):
+                    w *= 1.8
+                elif p.page_type in ("loan", "deposit"):
+                    w *= 0.9
+            elif exo.enabled and exo.campaign_flag == "deposit_promo":
+                if p.page_type in ("deposit", "deposit_main", "deposit_apply"):
+                    w *= 1.6
+            if exo.enabled and exo.weather_type == "rain":
+                if p.page_type in ("branch", "branch_find", "offline", "visit_reserve"):
+                    w *= 0.75
+                elif p.page_type in ("main", "dashboard", "account", "loan", "card", "deposit", "home"):
+                    w *= 1.05
+            items.append((p, max(0.0001, w)))
+        return items
+
+    def pick_page(self, when: datetime) -> PageSpec:
+        return weighted_choice(self._weighted_page_items(when))
+
+    def pick_event(self, page_type: str, when: datetime) -> str:
+        exo = self._exo(when)
+        base_mix = self.scenario.event_mix_by_page_type.get(page_type, self.scenario.event_mix_default)
+        mix = self.drift.event_mix_override(page_type, base_mix)
+        if exo.enabled and exo.campaign_flag in ("loan_promo", "card_promo", "deposit_promo"):
+            boosted = []
+            for evt, w in mix:
+                if evt == "click":
+                    boosted.append((evt, w * 1.15))
+                elif evt == "view":
+                    boosted.append((evt, w * 0.95))
+                else:
+                    boosted.append((evt, w))
+            mix = boosted
+        return weighted_choice(mix)
+
+    def _sample_session_length(self) -> int:
+        mean = max(30, int(self.scenario.session_mean_sec))
+        x = random.expovariate(1.0 / mean)
+        return int(clamp(x, 20, 60 * 30))
+
+    def _sample_target_pageviews(self) -> int:
+        mean = float(self.scenario.target_pv_per_visit_mean)
+        std = float(self.scenario.target_pv_per_visit_std)
+        cap = int(self.scenario.max_pageviews_per_session)
+        x = int(round(random.gauss(mean, std)))
+        return max(1, min(x, cap))
+
+    def _should_create_new_visitor(self, now_dt: datetime) -> bool:
+        hh = now_dt.hour
+        exo = self._exo(now_dt)
+        new_ratio = float(self.new_visit_ratio_by_hh[hh])
+        if exo.enabled and exo.weather_type == "rain" and 18 <= hh <= 22:
+            new_ratio *= 0.90
+        new_ratio = clamp(new_ratio, 0.02, 0.95)
+        if not getattr(self.id_pool, "_visitors", []):
+            return True
+        return random.random() < new_ratio
+
+    def _create_new_visitor(self, now_dt: datetime):
+        if hasattr(self.id_pool, "_create_new_visitor"):
+            return self.id_pool._create_new_visitor(now_dt)
+        return self.id_pool.get_or_create_visitor(now_dt)
+
+    def _reuse_visitor(self, now_dt: datetime):
+        visitors = getattr(self.id_pool, "_visitors", [])
+        if not visitors:
+            return self._create_new_visitor(now_dt)
+        v = random.choice(visitors)
+        if hasattr(self.id_pool, "_reuse_visitor"):
+            return self.id_pool._reuse_visitor(v, now_dt)
+        if hasattr(self.id_pool, "_random_ip_for_country"):
+            v.ip = self.id_pool._random_ip_for_country(v.country)
+        v.last_seen = now_dt
+        v.sessions += 1
+        if hasattr(self.id_pool, "maybe_acquire_uid_on_session_start"):
+            self.id_pool.maybe_acquire_uid_on_session_start(v, now_dt)
+        return v
+
+    def _create_new_or_reuse_visitor(self, now_dt: datetime, force_returning: bool = False):
+        visitors = getattr(self.id_pool, "_visitors", [])
+        if force_returning and visitors:
+            return self._reuse_visitor(now_dt)
+        if self._should_create_new_visitor(now_dt):
+            return self._create_new_visitor(now_dt)
+        return self._reuse_visitor(now_dt)
+
+    def _make_session(self, now_dt: datetime, force_returning: bool = False, burst_mode: bool = False) -> Session:
+        before_cnt = len(getattr(self.id_pool, "_visitors", []))
+        v = self._create_new_or_reuse_visitor(now_dt, force_returning=force_returning)
+        after_cnt = len(getattr(self.id_pool, "_visitors", []))
+        is_new_visitor = after_cnt > before_cnt
+        sid = make_uuid()
+        length_sec = self._sample_session_length()
+        target_pv = self._sample_target_pageviews()
+        return Session(
+            sid=sid,
+            visitor_pcid=v.pcid,
+            start=now_dt,
+            end=now_dt + timedelta(seconds=length_sec),
+            is_new_visitor=is_new_visitor,
+            target_pageviews=target_pv,
+            emitted_pageviews=0,
+            burst_mode=burst_mode,
+        )
+
+    def _get_visitor_by_pcid(self, pcid: str):
+        for v in getattr(self.id_pool, "_visitors", []):
+            if v.pcid == pcid:
+                return v
+        raise KeyError(f"visitor not found: {pcid}")
+
+    def _apply_exogenous_latency_status(self, page_type: str, event: str, when: datetime, latency: int, status: int) -> Tuple[int, int]:
+        exo = self._exo(when)
+        if exo.enabled:
+            if exo.system_flag == "auth_delay" and page_type in ("login", "auth", "otp"):
+                latency = int(latency * 1.35)
+                if random.random() < 0.05:
+                    status = random.choice([401, 429, 500, 503])
+            elif exo.system_flag == "degraded":
+                latency = int(latency * 1.18)
+                if random.random() < 0.02:
+                    status = random.choice([429, 500, 503])
+        return latency, status
+
+    def _render_line(self, dt: datetime, sess: Session, site_key: str) -> str:
+        meta: LogFormatMeta = self.meta_store.get(site_key)
+        exo = self._exo(dt)
+        page = self.pick_page(dt)
+        event = self.pick_event(page.page_type, dt)
+        v = self._get_visitor_by_pcid(sess.visitor_pcid)
+        if hasattr(self.id_pool, "maybe_acquire_uid_in_session"):
+            self.id_pool.maybe_acquire_uid_in_session(v, dt, event=event, page_type=page.page_type)
+        drift_enabled = self.drift.enabled and self.drift.weather != "none"
+        latency = sample_latency_ms(event, page.page_type, drift_enabled=drift_enabled)
+        status = sample_status(latency)
+        latency, status = self._apply_exogenous_latency_status(page.page_type, event, dt, latency, status)
+        bytes_ = sample_bytes(event, page.page_type)
+        path = event_to_path(page.path, event)
+        ref = sample_referrer(self.scenario.site_host, self.drift.weather, drift_enabled)
+        if event == "view":
+            sess.emitted_pageviews += 1
+        uid_val = v.uid or ""
+        drift_flag = "on" if drift_enabled else "off"
+        kv = (
+            f"cc={v.country}; al={v.accept_lang}; device={v.device}; "
+            f"pcid={v.pcid}; sid={sess.sid}; uid={uid_val}; "
+            f"evt={event}; page_type={page.page_type}; latency_ms={latency}; "
+            f"drift={drift_flag}; weather={self.drift.weather}; "
+            f"weather_type={exo.weather_type}; campaign_flag={exo.campaign_flag}; system_flag={exo.system_flag};"
+        )
+        ts = apache_time(dt.astimezone(meta.tz))
+        return meta.template.format(ip=v.ip, ts=ts, method="GET", path=path, httpv=meta.http_version, status=status, bytes=bytes_, ref=ref, ua=v.ua, kv=kv)
+
+    def _session_event_rate(self, dt: datetime) -> float:
+        exo = self._exo(dt)
+        base_rate = float(self.session_event_rate_by_hh[dt.hour])
+        if exo.enabled and exo.weather_type == "rain" and 18 <= dt.hour <= 22:
+            base_rate *= 1.05
+        if exo.enabled and exo.system_flag == "auth_delay":
+            base_rate *= 0.96
+        return max(0.0, base_rate)
+
+    def generate(self, start_dt: datetime, end_dt: datetime, avg_rps: float, site_key: str) -> Iterable[str]:
+        dt = start_dt
+        active: List[Session] = []
+        while dt <= end_dt:
+            mult = traffic_multiplier(dt.astimezone(KST), self.drift)
+            rps = avg_rps * mult
+            session_start_rate = clamp(rps / 8.0, 0.0, 20.0)
+            new_sessions = poisson(session_start_rate)
+            for _ in range(new_sessions):
+                jitter_ms = random.randint(0, 999)
+                st = dt + timedelta(milliseconds=jitter_ms)
+                active.append(self._make_session(st, force_returning=False, burst_mode=False))
+            active = [s for s in active if s.end >= dt]
+            lines: List[Tuple[datetime, str]] = []
+            for s in active:
+                n = poisson(self._session_event_rate(dt))
+                for _ in range(n):
+                    if s.emitted_pageviews >= s.target_pageviews and random.random() < 0.92:
+                        continue
+                    jitter_ms = random.randint(0, 999)
+                    jitter_us = random.randint(0, 999)
+                    t = dt + timedelta(milliseconds=jitter_ms, microseconds=jitter_us)
+                    if t <= end_dt:
+                        lines.append((t, self._render_line(t, s, site_key=site_key)))
+            lines.sort(key=lambda x: x[0])
+            for _, line in lines:
+                yield line
+            dt += timedelta(seconds=1)
+        if hasattr(self.id_pool, "promote_today_to_historical"):
+            self.id_pool.promote_today_to_historical()
