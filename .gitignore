@@ -1,0 +1,36 @@
+# runtime
+logs/
+log/
+tmp/
+backup/
+output/
+artifacts/
+
+# data
+data/
+*.tsv
+*.parquet
+*.feather
+*.db
+
+# env / secrets
+.env
+.env.*
+config/*.local
+config/*.secret.*
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# R
+.Rhistory
+.RData
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
