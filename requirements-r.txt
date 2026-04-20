@@ -1,7 +1,1 @@
-library(DBI)
-library(dplyr)
-library(lubridate)
-library(optparse)
-library(glue)
-library(tidyr)
-
+'DBI','RMariaDB','dplyr','lubridate','optparse','glue','tidyr','data.table','jsonlite'

@@ -93,6 +93,13 @@ class ScenarioConfig:
             weather_file=str(exo_raw.get("weather_file", "")),
             weather_api_base_url=str(exo_raw.get("weather_api_base_url", "")),
             weather_api_key=str(exo_raw.get("weather_api_key", "")),
+            use_timeline_db=bool(exo_raw.get("use_timeline_db", False)),
+            db_host=str(exo_raw.get("db_host", "127.0.0.1")),
+            db_port=int(exo_raw.get("db_port", 3306)),
+            db_user=str(exo_raw.get("db_user", "")),
+            db_password=str(exo_raw.get("db_password", "")),
+            db_name=str(exo_raw.get("db_name", "")),
+            profile_id=str(exo_raw.get("profile_id", "")),
         )
         sc = ScenarioConfig(
             site_host=d["site_host"],

@@ -1,10 +1,10 @@
-README.md
 pyproject.toml
 simulator/financial_data_reliability_platform.egg-info/PKG-INFO
 simulator/financial_data_reliability_platform.egg-info/SOURCES.txt
 simulator/financial_data_reliability_platform.egg-info/dependency_links.txt
 simulator/financial_data_reliability_platform.egg-info/entry_points.txt
 simulator/financial_data_reliability_platform.egg-info/top_level.txt
+simulator/stream_sim/generate_stream_anomaly_cases_v2.py
 simulator/weblog_sim/__init__.py
 simulator/weblog_sim/cli.py
 simulator/weblog_sim/core/auto_tune_profile.py

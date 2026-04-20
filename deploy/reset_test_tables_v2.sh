@@ -13,9 +13,15 @@ mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" <<SQ
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- scenario
-TRUNCATE TABLE scenario_experiment_result_day;
-TRUNCATE TABLE scenario_metric_change_log;
 TRUNCATE TABLE scenario_experiment_run;
+TRUNCATE TABLE scenario_adapter_result_log;
+TRUNCATE TABLE scenario_plan;
+TRUNCATE TABLE scenario_injection_log;
+TRUNCATE TABLE scenario_injection_result_log;
+TRUNCATE TABLE scenario_metric_change_log;
+TRUNCATE TABLE exogenous_state_timeline;
+TRUNCATE TABLE validation_run;
+
 
 -- ml
 TRUNCATE TABLE ml_prediction_result;
@@ -48,6 +54,8 @@ SQL
 
 if [ "$RESET_MODE" = "full" ] || [ "$RESET_MODE" = "full-with-mapping" ]; then
 mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" <<SQL
+
+-- metric
 TRUNCATE TABLE metric_value_day;
 TRUNCATE TABLE metric_value_hh;
 

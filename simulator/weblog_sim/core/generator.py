@@ -121,13 +121,6 @@ class WeblogGenerator:
         x = random.expovariate(1.0 / mean)
         return int(clamp(x, 20, 60 * 30))
 
-    def _sample_target_pageviews(self) -> int:
-        mean = float(self.scenario.target_pv_per_visit_mean)
-        std = float(self.scenario.target_pv_per_visit_std)
-        cap = int(self.scenario.max_pageviews_per_session)
-        x = int(round(random.gauss(mean, std)))
-        return max(1, min(x, cap))
-
     def _should_create_new_visitor(self, now_dt: datetime) -> bool:
         hh = now_dt.hour
         exo = self._exo(now_dt)
@@ -167,54 +160,11 @@ class WeblogGenerator:
             return self._create_new_visitor(now_dt)
         return self._reuse_visitor(now_dt)
 
-    def _make_session(self, now_dt: datetime, force_returning: bool = False, burst_mode: bool = False) -> Session:
-        before_cnt = len(getattr(self.id_pool, "_visitors", []))
-        v = self._create_new_or_reuse_visitor(now_dt, force_returning=force_returning)
-        after_cnt = len(getattr(self.id_pool, "_visitors", []))
-        is_new_visitor = after_cnt > before_cnt
-        sid = make_uuid()
-        length_sec = self._sample_session_length()
-        target_pv = self._sample_target_pageviews()
-        return Session(
-            sid=sid,
-            visitor_pcid=v.pcid,
-            start=now_dt,
-            end=now_dt + timedelta(seconds=length_sec),
-            is_new_visitor=is_new_visitor,
-            target_pageviews=target_pv,
-            emitted_pageviews=0,
-            burst_mode=burst_mode,
-        )
-
     def _get_visitor_by_pcid(self, pcid: str):
         for v in getattr(self.id_pool, "_visitors", []):
             if v.pcid == pcid:
                 return v
         raise KeyError(f"visitor not found: {pcid}")
-
-    def _apply_exogenous_latency_status(self, page_type: str, event: str, when: datetime, latency: int, status: int) -> Tuple[int, int]:
-        exo = self._exo(when)
-        if exo.enabled:
-            if exo.system_flag == "auth_delay" and page_type in ("login", "auth", "otp"):
-                latency = int(latency * 1.35)
-                if random.random() < 0.05:
-                    status = random.choice([401, 429, 500, 503])
-            elif exo.system_flag == "degraded":
-                latency = int(latency * 1.18)
-                if random.random() < 0.02:
-                    status = random.choice([429, 500, 503])
-        return latency, status
-
-    def _completion_multiplier(self, when: datetime, domain: str) -> float:
-        exo = self._exo(when)
-        mult = 1.0
-        if exo.enabled and exo.system_flag == "auth_delay" and domain == "auth":
-            mult *= 0.45
-        if exo.enabled and exo.system_flag == "degraded":
-            mult *= 0.75
-        if exo.enabled and exo.weather_type == "rain" and domain in ("loan", "card", "transfer"):
-            mult *= 0.9
-        return max(0.05, min(mult, 1.2))
 
     def _funnel_path_and_event(self, page: PageSpec, when: datetime, generic_event: str) -> Tuple[str, str]:
         """
@@ -346,29 +296,102 @@ class WeblogGenerator:
             kv=kv,
         )
 
+
+
+    def _sample_target_pageviews(self, when: Optional[datetime] = None) -> int:
+        mean = float(self.scenario.target_pv_per_visit_mean)
+        std = float(self.scenario.target_pv_per_visit_std)
+        cap = int(self.scenario.max_pageviews_per_session)
+        if when is not None:
+            exo = self._exo(when)
+            if exo.enabled:
+                mean = max(1.0, mean * float(getattr(exo, "volume_multiplier", 1.0) or 1.0))
+        x = int(round(random.gauss(mean, std)))
+        return max(1, min(x, cap))
+
+    def _make_session(self, now_dt: datetime, force_returning: bool = False, burst_mode: bool = False) -> Session:
+        before_cnt = len(getattr(self.id_pool, "_visitors", []))
+        v = self._create_new_or_reuse_visitor(now_dt, force_returning=force_returning)
+        after_cnt = len(getattr(self.id_pool, "_visitors", []))
+        is_new_visitor = after_cnt > before_cnt
+        sid = make_uuid()
+        length_sec = self._sample_session_length()
+        target_pv = self._sample_target_pageviews(now_dt)
+        return Session(
+            sid=sid,
+            visitor_pcid=v.pcid,
+            start=now_dt,
+            end=now_dt + timedelta(seconds=length_sec),
+            is_new_visitor=is_new_visitor,
+            target_pageviews=target_pv,
+            emitted_pageviews=0,
+            burst_mode=burst_mode,
+        )
+
+    def _apply_exogenous_latency_status(
+        self,
+        page_type: str,
+        event: str,
+        when: datetime,
+        latency: int,
+        status: int,
+    ) -> Tuple[int, int]:
+        exo = self._exo(when)
+        if exo.enabled:
+            latency = int(latency * float(getattr(exo, "timeout_multiplier", 1.0) or 1.0))
+            if exo.system_flag == "auth_delay" and page_type in ("login", "auth", "otp"):
+                latency = int(latency * 1.15)
+                if random.random() < 0.05:
+                    status = random.choice([401, 429, 500, 503])
+            elif exo.system_flag == "degraded":
+                if random.random() < 0.02:
+                    status = random.choice([429, 500, 503])
+        return latency, status
+
+    def _completion_multiplier(self, when: datetime, domain: str) -> float:
+        exo = self._exo(when)
+        mult = 1.0
+        if exo.enabled:
+            mult *= float(getattr(exo, "conversion_multiplier", 1.0) or 1.0)
+            if exo.system_flag == "auth_delay" and domain == "auth":
+                mult *= 0.45
+            if exo.system_flag == "degraded":
+                mult *= 0.75
+            if exo.weather_type == "rain" and domain in ("loan", "card", "transfer"):
+                mult *= 0.9
+        return max(0.05, min(mult, 1.5))
+
     def _session_event_rate(self, dt: datetime) -> float:
         exo = self._exo(dt)
         base_rate = float(self.session_event_rate_by_hh[dt.hour])
-        if exo.enabled and exo.weather_type == "rain" and 18 <= dt.hour <= 22:
-            base_rate *= 1.05
-        if exo.enabled and exo.system_flag == "auth_delay":
-            base_rate *= 0.96
+        if exo.enabled:
+            base_rate *= float(getattr(exo, "volume_multiplier", 1.0) or 1.0)
+            if exo.weather_type == "rain" and 18 <= dt.hour <= 22:
+                base_rate *= 1.05
+            if exo.system_flag == "auth_delay":
+                base_rate *= 0.96
         return max(0.0, base_rate)
 
     def generate(self, start_dt: datetime, end_dt: datetime, avg_rps: float, site_key: str) -> Iterable[str]:
         dt = start_dt
         active: List[Session] = []
+
         while dt <= end_dt:
+            exo = self._exo(dt)
             mult = traffic_multiplier(dt.astimezone(KST), self.drift)
-            rps = avg_rps * mult
+            exo_vol = float(getattr(exo, "volume_multiplier", 1.0) or 1.0) if exo.enabled else 1.0
+            rps = avg_rps * mult * exo_vol
             session_start_rate = clamp(rps / 8.0, 0.0, 20.0)
             new_sessions = poisson(session_start_rate)
+
             for _ in range(new_sessions):
                 jitter_ms = random.randint(0, 999)
                 st = dt + timedelta(milliseconds=jitter_ms)
                 active.append(self._make_session(st, force_returning=False, burst_mode=False))
+
             active = [s for s in active if s.end >= dt]
             lines: List[Tuple[datetime, str]] = []
+
             for s in active:
                 n = poisson(self._session_event_rate(dt))
                 for _ in range(n):
@@ -379,9 +402,12 @@ class WeblogGenerator:
                     t = dt + timedelta(milliseconds=jitter_ms, microseconds=jitter_us)
                     if t <= end_dt:
                         lines.append((t, self._render_line(t, s, site_key=site_key)))
+
             lines.sort(key=lambda x: x[0])
             for _, line in lines:
                 yield line
+
             dt += timedelta(seconds=1)
+
         if hasattr(self.id_pool, "promote_today_to_historical"):
             self.id_pool.promote_today_to_historical()
